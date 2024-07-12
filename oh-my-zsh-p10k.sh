@@ -2,13 +2,37 @@
 
 set -e
 
-# Check if zsh is already installed
-if ! command -v zsh &> /dev/null; then
-    echo "zsh is not installed. Installing..."
-    sudo apt install zsh -y
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    ostype="macOS"
+elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    ostype="Linux"
 else
-    echo "zsh is already installed"
+    echo "Unsupported OS"
+    exit 1
 fi
+
+check_and_install() {
+    if ! command -v $1 &> /dev/null; then
+        echo "$1 is not installed. Installing..."
+        if [[ "$ostype" == "macOS" ]]; then
+            echo "Please install $1 using Homebrew or Xcode Command Line Tools."
+            exit 1
+        elif [[ "$ostype" == "Linux" ]]; then
+            if sudo -v; then
+                sudo apt install $1 -y
+            else
+                echo "This script requires sudo permissions. Please ask the administrator to install the necessary packages."
+                exit 1
+            fi
+        else
+            echo "Unsupported OS"
+            exit 1
+        fi
+    fi
+}
+
+check_and_install "git"
+check_and_install "zsh"
 
 # oh-my-zsh
 OMZ_DIR=$HOME/.oh-my-zsh
@@ -38,10 +62,10 @@ check_and_clone_plugin "zsh-autosuggestions"
 check_and_clone_plugin "zsh-completions"
 
 # edit config and theme
+## add compinit
 if ! grep -q "autoload -U compinit && compinit" ~/.zshrc; then
     echo "autoload -U compinit && compinit" >> ~/.zshrc
 fi
-sed -i '/^plugins=/c\plugins=(git sudo z zsh-syntax-highlighting zsh-autosuggestions zsh-completions)' ~/.zshrc
 
 # use p10k theme
 P10K_DIR="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/themes/powerlevel10k"
@@ -50,7 +74,17 @@ if [ ! -d "$P10K_DIR" ]; then
 else
     echo "powerlevel10k theme already cloned, skipping"
 fi
-sed -i '/^ZSH_THEME=/c\ZSH_THEME="powerlevel10k/powerlevel10k"' ~/.zshrc
+
+# Add plugins
+if [[ "$ostype" == "macOS" ]]; then
+    printf '%s\n' '/^plugins=/c\' 'plugins=(git sudo z zsh-syntax-highlighting zsh-autosuggestions zsh-completions)' | sed -i '' -f - ~/.zshrc
+    printf '%s\n' "/^# zstyle ':omz:update' mode disabled/c\\" "zstyle ':omz:update' mode disabled  # disable automatic updates" | sed -i '' -f - ~/.zshrc
+    printf '%s\n' '/^ZSH_THEME=/c\' 'ZSH_THEME="powerlevel10k/powerlevel10k"' | sed -i '' -f - ~/.zshrc
+else
+    sed -i '/^plugins=/c\plugins=(git sudo z zsh-syntax-highlighting zsh-autosuggestions zsh-completions)' ~/.zshrc
+    sed -i "/^# zstyle ':omz:update' mode disabled/c\zstyle ':omz:update' mode disabled  # disable automatic updates" ~/.zshrc
+    sed -i '/^ZSH_THEME=/c\ZSH_THEME="powerlevel10k/powerlevel10k"' ~/.zshrc
+fi
 
 # change default shell
 if [ ! -f ~/.bash_profile ]; then
