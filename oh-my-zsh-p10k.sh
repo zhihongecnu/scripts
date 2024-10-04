@@ -2,10 +2,16 @@
 
 set -e
 
+# Detect OS
 if [[ "$OSTYPE" == "darwin"* ]]; then
     ostype="macOS"
-elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
-    ostype="Linux"
+elif [[ -f /etc/os-release ]]; then
+    . /etc/os-release
+    if [[ "$ID" == "alpine" ]]; then
+        ostype="Alpine"
+    else
+        ostype="Linux"
+    fi
 else
     echo "Unsupported OS"
     exit 1
@@ -20,6 +26,13 @@ check_and_install() {
         elif [[ "$ostype" == "Linux" ]]; then
             if sudo -v; then
                 sudo apt install $1 -y
+            else
+                echo "This script requires sudo permissions. Please ask the administrator to install the necessary packages."
+                exit 1
+            fi
+        elif [[ "$ostype" == "Alpine" ]]; then
+            if sudo -v; then
+                sudo apk add --no-cache $1
             else
                 echo "This script requires sudo permissions. Please ask the administrator to install the necessary packages."
                 exit 1
